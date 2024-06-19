@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
-import { srConfig, email } from '@config';
+import { srConfig } from '@config';
 import sr from '@utils/sr';
 import { usePrefersReducedMotion } from '@hooks';
-
+import { database } from '../../firebase/index';
+import { ref, onValue } from 'firebase/database';
 const StyledContactSection = styled.section`
   max-width: 600px;
   margin: 0 auto 100px;
@@ -44,8 +45,21 @@ const StyledContactSection = styled.section`
 const Contact = () => {
   const revealContainer = useRef(null);
   const prefersReducedMotion = usePrefersReducedMotion();
-
+  const [general, setGeneral] = useState({});
+  const getData = () => {
+    const generalRef = ref(database, '/general');
+    onValue(
+      generalRef,
+      v => {
+        setGeneral(v.val());
+      },
+      {
+        onlyOnce: true,
+      },
+    );
+  };
   useEffect(() => {
+    getData();
     if (prefersReducedMotion) {
       return;
     }
@@ -64,7 +78,7 @@ const Contact = () => {
         Whether you have a question or just want to say hi, I’ll try my best to get back to you!
       </p>
 
-      <a className="email-link" href={`mailto:${email}`}>
+      <a className="email-link" href={`mailto:${general.email}`}>
         Say Hello
       </a>
     </StyledContactSection>

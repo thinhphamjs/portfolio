@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useStaticQuery, graphql } from 'gatsby';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Link } from 'gatsby';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import styled from 'styled-components';
 import { srConfig } from '@config';
 import sr from '@utils/sr';
 import { Icon } from '@components/icons';
 import { usePrefersReducedMotion } from '@hooks';
-
+import { database } from '../../firebase/index';
+import { ref, onValue } from 'firebase/database';
 const StyledProjectsSection = styled.section`
   display: flex;
   flex-direction: column;
@@ -166,37 +167,26 @@ const StyledProject = styled.li`
 `;
 
 const Projects = () => {
-  const data = useStaticQuery(graphql`
-    query {
-      projects: allMarkdownRemark(
-        filter: {
-          fileAbsolutePath: { regex: "/content/projects/" }
-          frontmatter: { showInProjects: { ne: false } }
-        }
-        sort: { fields: [frontmatter___date], order: DESC }
-      ) {
-        edges {
-          node {
-            frontmatter {
-              title
-              tech
-              github
-              external
-            }
-            html
-          }
-        }
-      }
-    }
-  `);
-
   const [showMore, setShowMore] = useState(false);
   const revealTitle = useRef(null);
   const revealArchiveLink = useRef(null);
   const revealProjects = useRef([]);
   const prefersReducedMotion = usePrefersReducedMotion();
-
+  const [projects, setProjects] = useState([]);
+  const getData = () => {
+    const projectsRef = ref(database, '/projects');
+    onValue(
+      projectsRef,
+      v => {
+        setProjects(v.val().filter(j => !j.is_featured));
+      },
+      {
+        onlyOnce: true,
+      },
+    );
+  };
   useEffect(() => {
+    getData();
     if (prefersReducedMotion) {
       return;
     }
@@ -207,13 +197,15 @@ const Projects = () => {
   }, []);
 
   const GRID_LIMIT = 6;
-  const projects = data.projects.edges.filter(({ node }) => node);
-  const firstSix = projects.slice(0, GRID_LIMIT);
-  const projectsToShow = showMore ? projects : firstSix;
+  const firstSix = useMemo(() => projects.slice(0, GRID_LIMIT), [projects]);
+  const projectsToShow = useMemo(() => (showMore ? projects : firstSix), [
+    projects,
+    firstSix,
+    showMore,
+  ]);
 
   const projectInner = node => {
-    const { frontmatter, html } = node;
-    const { github, external, title, tech } = frontmatter;
+    const { github, external, title, skills, summary } = node;
 
     return (
       <div className="project-inner">
@@ -247,13 +239,13 @@ const Projects = () => {
             </a>
           </h3>
 
-          <div className="project-description" dangerouslySetInnerHTML={{ __html: html }} />
+          <div className="project-description" dangerouslySetInnerHTML={{ __html: summary }} />
         </header>
 
         <footer>
-          {tech && (
+          {skills && (
             <ul className="project-tech-list">
-              {tech.map((tech, i) => (
+              {skills.map((tech, i) => (
                 <li key={i}>{tech}</li>
               ))}
             </ul>
@@ -275,14 +267,14 @@ const Projects = () => {
         {prefersReducedMotion ? (
           <>
             {projectsToShow &&
-              projectsToShow.map(({ node }, i) => (
-                <StyledProject key={i}>{projectInner(node)}</StyledProject>
+              projectsToShow.map((project, i) => (
+                <StyledProject key={i}>{projectInner(project)}</StyledProject>
               ))}
           </>
         ) : (
           <TransitionGroup component={null}>
             {projectsToShow &&
-              projectsToShow.map(({ node }, i) => (
+              projectsToShow.map((project, i) => (
                 <CSSTransition
                   key={i}
                   classNames="fadeup"
@@ -294,7 +286,7 @@ const Projects = () => {
                     style={{
                       transitionDelay: `${i >= GRID_LIMIT ? (i - GRID_LIMIT) * 100 : 0}ms`,
                     }}>
-                    {projectInner(node)}
+                    {projectInner(project)}
                   </StyledProject>
                 </CSSTransition>
               ))}

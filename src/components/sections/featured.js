@@ -1,12 +1,14 @@
-import React, { useEffect, useRef } from 'react';
-import { useStaticQuery, graphql } from 'gatsby';
-import { GatsbyImage, getImage } from 'gatsby-plugin-image';
+import React, { useEffect, useRef, useState } from 'react';
+
 import styled from 'styled-components';
 import sr from '@utils/sr';
 import { srConfig } from '@config';
 import { Icon } from '@components/icons';
 import { usePrefersReducedMotion } from '@hooks';
 
+import { database } from '../../firebase/index';
+
+import { ref, onValue } from 'firebase/database';
 const StyledProjectsGrid = styled.ul`
   ${({ theme }) => theme.mixins.resetList};
 
@@ -84,7 +86,9 @@ const StyledProject = styled.li`
     }
     .project-image {
       grid-column: 1 / 8;
-
+      img {
+        height: 320px;
+      }
       @media (max-width: 768px) {
         grid-column: 1 / -1;
       }
@@ -304,39 +308,24 @@ const StyledProject = styled.li`
 `;
 
 const Featured = () => {
-  const data = useStaticQuery(graphql`
-    {
-      featured: allMarkdownRemark(
-        filter: { fileAbsolutePath: { regex: "/content/featured/" } }
-        sort: { fields: [frontmatter___date], order: ASC }
-      ) {
-        edges {
-          node {
-            frontmatter {
-              title
-              cover {
-                childImageSharp {
-                  gatsbyImageData(width: 700, placeholder: BLURRED, formats: [AUTO, WEBP, AVIF])
-                }
-              }
-              tech
-              github
-              external
-              cta
-            }
-            html
-          }
-        }
-      }
-    }
-  `);
-
-  const featuredProjects = data.featured.edges.filter(({ node }) => node);
   const revealTitle = useRef(null);
   const revealProjects = useRef([]);
   const prefersReducedMotion = usePrefersReducedMotion();
-
+  const [featuredProjects, setProjects] = useState([]);
+  const getData = () => {
+    const projectsRef = ref(database, '/projects');
+    onValue(
+      projectsRef,
+      v => {
+        setProjects(v.val().filter(j => j.is_featured));
+      },
+      {
+        onlyOnce: true,
+      },
+    );
+  };
   useEffect(() => {
+    getData();
     if (prefersReducedMotion) {
       return;
     }
@@ -353,10 +342,8 @@ const Featured = () => {
 
       <StyledProjectsGrid>
         {featuredProjects &&
-          featuredProjects.map(({ node }, i) => {
-            const { frontmatter, html } = node;
-            const { external, title, tech, github, cover, cta } = frontmatter;
-            const image = getImage(cover);
+          featuredProjects.map((project, i) => {
+            const { external, title, skills, github, feature_img, cta, summary } = project;
 
             return (
               <StyledProject key={i} ref={el => (revealProjects.current[i] = el)}>
@@ -365,17 +352,19 @@ const Featured = () => {
                     <p className="project-overline">Featured Project</p>
 
                     <h3 className="project-title">
-                      <a href={external}>{title}</a>
+                      <a href={external} target="_blank" rel="noreferrer">
+                        {title}
+                      </a>
                     </h3>
 
                     <div
                       className="project-description"
-                      dangerouslySetInnerHTML={{ __html: html }}
+                      dangerouslySetInnerHTML={{ __html: summary }}
                     />
 
-                    {tech.length && (
+                    {skills.length && (
                       <ul className="project-tech-list">
-                        {tech.map((tech, i) => (
+                        {skills.map((tech, i) => (
                           <li key={i}>{tech}</li>
                         ))}
                       </ul>
@@ -383,17 +372,21 @@ const Featured = () => {
 
                     <div className="project-links">
                       {cta && (
-                        <a href={cta} aria-label="Course Link" className="cta">
+                        <a href={cta} aria-label="Course Link" className="cta" target="_blank" rel="noreferrer">
                           Learn More
                         </a>
                       )}
                       {github && (
-                        <a href={github} aria-label="GitHub Link">
+                        <a href={github} aria-label="GitHub Link" target="_blank" rel="noreferrer">
                           <Icon name="GitHub" />
                         </a>
                       )}
                       {external && !cta && (
-                        <a href={external} aria-label="External Link" className="external">
+                        <a
+                          href={external}
+                          aria-label="External Link"
+                          className="external"
+                          target="_blank" rel="noreferrer">
                           <Icon name="External" />
                         </a>
                       )}
@@ -402,8 +395,60 @@ const Featured = () => {
                 </div>
 
                 <div className="project-image">
-                  <a href={external ? external : github ? github : '#'}>
-                    <GatsbyImage image={image} alt={title} className="img" />
+                  <a href={external ? external : github ? github : '#'} target="_blank" rel="noreferrer">
+                    <div
+                      data-gatsby-image-wrapper=""
+                      className="gatsby-image-wrapper gatsby-image-wrapper-constrained img">
+                      <div>
+                        <img
+                          alt=""
+                          role="presentation"
+                          aria-hidden="true"
+                          src={feature_img}
+                          style={{ maxWidth: '100%', display: 'block', position: 'static' }}
+                        />
+                      </div>
+                      <img
+                        aria-hidden="true"
+                        data-placeholder-image=""
+                        decoding="async"
+                        src={feature_img}
+                        alt=""
+                        style={{
+                          opacity: 0,
+                          transition: 'opacity 500ms linear 0s',
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <picture>
+                        <source
+                          type="image/avif"
+                          srcSet={`${feature_img} 175w,
+                          ${feature_img} 350w,
+                          ${feature_img} 700w`}
+                          sizes="(min-width: 700px) 700px, 100vw"
+                        />
+                        <source
+                          type="image/webp"
+                          srcSet={`${feature_img} 175w,
+                          ${feature_img} 350w,
+                          ${feature_img} 700w`}
+                          sizes="(min-width: 700px) 700px, 100vw"
+                        />
+                        <img
+                          data-main-image=""
+                          sizes="(min-width: 700px) 700px, 100vw"
+                          decoding="async"
+                          src={feature_img}
+                          srcSet={`${feature_img} 175w,
+                          ${feature_img} 350w,
+                          ${feature_img} 700w`}
+                          alt="Halcyon Theme"
+                          style={{ objectFit: 'cover', opacity: 1 }}
+                        />
+                      </picture>
+                      <noscript />
+                    </div>
                   </a>
                 </div>
               </StyledProject>

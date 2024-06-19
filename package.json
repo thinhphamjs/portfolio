@@ -1,12 +1,8 @@
 {
   "name": "v4",
-  "description": "Personal Website V4",
+  "description": "Personal Website",
   "version": "1.0.0",
-  "author": "Brittany Chiang <brittany.chiang@gmail.com>",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bchiang7/v4"
-  },
+  "author": "Thinh Pham",
   "keywords": [
     "gatsby"
   ],
@@ -34,7 +30,10 @@
   "dependencies": {
     "animejs": "^3.1.0",
     "babel-plugin-styled-components": "^1.12.0",
+    "firebase": "^9.4.1",
     "gatsby": "^3.4.1",
+    "gatsby-plugin-firebase": "^0.2.0-beta.4",
+    "gatsby-plugin-firebase-v9.0": "^1.0.3",
     "gatsby-plugin-google-analytics": "^3.4.0",
     "gatsby-plugin-image": "^1.4.0",
     "gatsby-plugin-manifest": "^3.4.0",

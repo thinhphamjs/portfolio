@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useStaticQuery, graphql } from 'gatsby';
 import { CSSTransition } from 'react-transition-group';
 import styled from 'styled-components';
 import { srConfig } from '@config';
 import { KEY_CODES } from '@utils';
 import sr from '@utils/sr';
 import { usePrefersReducedMotion } from '@hooks';
+import { database } from '../../firebase/index';
+
+import { ref, onValue } from 'firebase/database';
 
 const StyledJobsSection = styled.section`
   max-width: 700px;
@@ -165,37 +167,50 @@ const StyledTabPanel = styled.div`
 `;
 
 const Jobs = () => {
-  const data = useStaticQuery(graphql`
-    query {
-      jobs: allMarkdownRemark(
-        filter: { fileAbsolutePath: { regex: "/content/jobs/" } }
-        sort: { fields: [frontmatter___date], order: DESC }
-      ) {
-        edges {
-          node {
-            frontmatter {
-              title
-              company
-              location
-              range
-              url
-            }
-            html
-          }
-        }
-      }
-    }
-  `);
+  // const data = useStaticQuery(graphql`
+  //   query {
+  //     jobs: allMarkdownRemark(
+  //       filter: { fileAbsolutePath: { regex: "/content/jobs/" } }
+  //       sort: { fields: [frontmatter___date], order: DESC }
+  //     ) {
+  //       edges {
+  //         node {
+  //           frontmatter {
+  //             title
+  //             company
+  //             location
+  //             range
+  //             url
+  //           }
+  //           html
+  //         }
+  //       }
+  //     }
+  //   }
+  // `);
 
-  const jobsData = data.jobs.edges;
-
+  // const jobsData = data.jobs.edges;
+  // console.log(jobsData);
+  const [jobs, setJobs] = useState([]);
   const [activeTabId, setActiveTabId] = useState(0);
   const [tabFocus, setTabFocus] = useState(null);
   const tabs = useRef([]);
   const revealContainer = useRef(null);
   const prefersReducedMotion = usePrefersReducedMotion();
-
+  const getData = () => {
+    const jobsRef = ref(database, '/jobs');
+    onValue(
+      jobsRef,
+      v => {
+        setJobs(v.val().reverse());
+      },
+      {
+        onlyOnce: true,
+      },
+    );
+  };
   useEffect(() => {
+    getData();
     if (prefersReducedMotion) {
       return;
     }
@@ -248,9 +263,9 @@ const Jobs = () => {
 
       <div className="inner">
         <StyledTabList role="tablist" aria-label="Job tabs" onKeyDown={e => onKeyDown(e)}>
-          {jobsData &&
-            jobsData.map(({ node }, i) => {
-              const { company } = node.frontmatter;
+          {jobs &&
+            jobs.map((job, i) => {
+              const { company } = job;
               return (
                 <StyledTabButton
                   key={i}
@@ -270,10 +285,10 @@ const Jobs = () => {
         </StyledTabList>
 
         <StyledTabPanels>
-          {jobsData &&
-            jobsData.map(({ node }, i) => {
-              const { frontmatter, html } = node;
-              const { title, url, company, range } = frontmatter;
+          {jobs &&
+            jobs.map((job, i) => {
+              const { res } = job;
+              const { title, website, company, range } = job;
 
               return (
                 <CSSTransition key={i} in={activeTabId === i} timeout={250} classNames="fade">
@@ -288,7 +303,7 @@ const Jobs = () => {
                       <span>{title}</span>
                       <span className="company">
                         &nbsp;@&nbsp;
-                        <a href={url} className="inline-link">
+                        <a href={website} className="inline-link">
                           {company}
                         </a>
                       </span>
@@ -296,7 +311,11 @@ const Jobs = () => {
 
                     <p className="range">{range}</p>
 
-                    <div dangerouslySetInnerHTML={{ __html: html }} />
+                    <ul>
+                      {res.reverse().map(r => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
                   </StyledTabPanel>
                 </CSSTransition>
               );
